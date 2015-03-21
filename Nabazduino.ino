@@ -14,6 +14,7 @@ struct CRGB leds[NUM_LEDS];
 
 TM1809Controller800Mhz<LEDSTRIP_PIN> LED;
 SegmentCollection segments(leds);
+SegmentCollection segments_on(leds);
 
 Motor motorLeft = Motor(2, 3);
 Motor motorRight = Motor(4, 5);
@@ -24,21 +25,39 @@ T_SegmentConfig seg_config[NB_SEGMENT] = {
     .start = 0,
     .length = NUM_LEDS,
     .effect = {
-      .color = CBlue,
+      .color = CWhite,
       .direction = UP,
-      .type = Rainbow
+      .type = Spark
     }
   }
 };
 
+T_SegmentConfig seg_config_on[NB_SEGMENT] = {
+  {
+    .start = 0,
+    .length = NUM_LEDS,
+    .effect = {
+      .color = CBlue,
+      .direction = UP,
+      .type = Wave
+    }
+  }
+};
+
+
 void setup() {
+  Serial.begin(9600);
+  Serial.setTimeout(100);
   memset(leds, 0x00, NUM_LEDS * sizeof(CRGB));
 
-  Effect_Factory factory;
   for(unsigned int i = 0; i < NB_SEGMENT; i++) {
     segments.addSegment(new Segment(seg_config[i]));
   }
+  for(unsigned int i = 0; i < NB_SEGMENT; i++) {
+    segments_on.addSegment(new Segment(seg_config_on[i]));
+  }
   segments.init();
+  segments_on.init();
   LED.init();
   
   motorLeft.init();
@@ -48,20 +67,31 @@ void setup() {
   digitalWrite(HEAD_BUTTON, HIGH);  
 }
 
+int mode = 0;
+
 void loop() {
-  switch(readMode()) {
+  SegmentCollection * s;
+
+  mode = readMode();
+/*  if(Serial.available() > 0){      // if data present, blink
+    mode = Serial.read();
+  }*/
+
+  switch(mode) {
     case 0 :
       motorLeft.setMode(OFF);
       motorRight.setMode(OFF);
+      s = & segments;
       break;
     case 1 :
       motorLeft.setMode(CLOCKWISE);
       motorRight.setMode(COUNTERCLOCKWISE);
+      s = & segments_on;
       break;
   }
-  segments.preStep();
+  s->preStep();
   LED.showRGB((unsigned char *) leds, NUM_LEDS);
-  segments.postStep();
+  s->postStep();
   delay(20);
 }
 
@@ -94,6 +124,7 @@ int readMode()
       // only toggle the LED if the new button state is LOW
       if (buttonState == LOW) {
         mode = (mode+1) % 2;
+        memset(leds, 0x00, NUM_LEDS * sizeof(CRGB));
       }
     }
   }
